@@ -7,7 +7,7 @@ import (
 
 type Lexer struct {
 	Text         string
-	Pos          int
+	Pos          Position
 	CurrentChar  string
 	ReservedKeys map[string]TokenType
 }
@@ -16,17 +16,18 @@ func NewLexer(text string) *Lexer {
 	l := &Lexer{
 		Text:         text,
 		ReservedKeys: TOKENS,
+		Pos:          NewPosition(),
+		CurrentChar:  string(text[0]),
 	}
-	l.CurrentChar = string(l.Text[l.Pos])
 	return l
 }
 
 func (l *Lexer) Advance() {
-	l.Pos++
-	if l.Pos >= len(l.Text) {
+	l.Pos.Advance(l.CurrentChar)
+	if l.Pos.Index >= len(l.Text) {
 		l.CurrentChar = ""
 	} else {
-		l.CurrentChar = string(l.Text[l.Pos])
+		l.CurrentChar = string(l.Text[l.Pos.Index])
 	}
 }
 
@@ -36,24 +37,26 @@ func (l *Lexer) SkipWhitespace() {
 	}
 }
 
-func (l *Lexer) NextToken() Token {
+func (l *Lexer) NextToken() (Token, error) {
 	for l.CurrentChar != "" {
-		if l.CurrentChar == " " {
+		if l.CurrentChar == " " || l.CurrentChar == "\t" || l.CurrentChar == "\n" {
 			l.SkipWhitespace()
 			continue
 		}
 		if strings.ContainsAny(l.CurrentChar, DIGITS) {
-			return l.numeric()
+			return l.numeric(), nil
 		}
 
 		if t, ok := l.ReservedKeys[l.CurrentChar]; ok {
 			tokenValue := l.CurrentChar
 			l.Advance()
-			return Token{tokenValue, t}
+			return Token{tokenValue, t}, nil
 		}
-		panic(fmt.Sprintf("Invalid character: %s", l.CurrentChar))
+
+		return Token{}, &NameError{fmt.Sprintf("Unknown character '%s'", l.CurrentChar), l.Pos.Line, "<stdin>"}
+
 	}
-	return Token{"", ""}
+	return Token{"", ""}, nil
 }
 
 func (l *Lexer) numeric() Token {
@@ -76,7 +79,14 @@ func (l *Lexer) numeric() Token {
 
 func (l *Lexer) CreateTokens() []Token {
 	var tokens []Token
-	for token := l.NextToken(); token.Type != ""; token = l.NextToken() {
+	for {
+		token, err := l.NextToken()
+		if err != nil {
+			fmt.Println(err)
+		}
+		if token.Type == "" {
+			break
+		}
 		tokens = append(tokens, token)
 	}
 	return tokens

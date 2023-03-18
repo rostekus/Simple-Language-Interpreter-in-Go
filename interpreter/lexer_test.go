@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -52,4 +53,22 @@ func TestLexer(t *testing.T) {
 
 	}
 	fmt.Println("Lexer tests passed")
+}
+
+func TestLexerCreateTokenError(t *testing.T) {
+	cases := []struct {
+		input string
+		want  Token
+		err   error
+	}{
+		{"=", Token{}, NameError{fmt.Sprintf("Unknown character '%s'", "="), 1, "<stdin>"}},
+	}
+	for _, c := range cases {
+		lex := NewLexer(c.input)
+		_, err := lex.NextToken()
+		if errors.Is(err, c.err) {
+			t.Errorf("Lexer.CreateToken() for '%s' returned %+v, want %+v", c.input, err, c.want)
+		}
+	}
+	fmt.Println("Lexer error tests passed")
 }
